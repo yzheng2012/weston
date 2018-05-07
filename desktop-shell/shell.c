@@ -4672,7 +4672,7 @@ shell_reposition_view_on_output_destroy(struct weston_view *view)
 		}
 	}
 
-	if (!visible) {
+	if (!visible && !wl_list_empty(&ec->output_list)) {
 		first_output = container_of(ec->output_list.next,
 					    struct weston_output, link);
 
