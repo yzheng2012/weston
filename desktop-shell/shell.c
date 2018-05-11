@@ -5088,6 +5088,8 @@ wet_shell_init(struct weston_compositor *ec,
 
 	screenshooter_create(ec);
 
+	wlrandr_create(ec);
+
 	shell_add_bindings(ec, shell);
 
 	shell_fade_init(shell);

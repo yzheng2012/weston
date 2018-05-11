@@ -35,6 +35,9 @@ extern "C" {
 void
 screenshooter_create(struct weston_compositor *ec);
 
+void
+wlrandr_create(struct weston_compositor *ec);
+
 struct weston_process;
 typedef void (*weston_process_cleanup_func_t)(struct weston_process *process,
 					    int status);

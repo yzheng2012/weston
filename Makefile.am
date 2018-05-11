@@ -168,7 +168,9 @@ nodist_libweston_@LIBWESTON_MAJOR@_la_SOURCES =				\
 	protocol/pointer-constraints-unstable-v1-protocol.c		\
 	protocol/pointer-constraints-unstable-v1-server-protocol.h      \
 	protocol/input-timestamps-unstable-v1-protocol.c		\
-	protocol/input-timestamps-unstable-v1-server-protocol.h
+	protocol/input-timestamps-unstable-v1-server-protocol.h		\
+	protocol/wlrandr-protocol.c			\
+	protocol/wlrandr-server-protocol.h
 
 BUILT_SOURCES += $(nodist_libweston_@LIBWESTON_MAJOR@_la_SOURCES)
 
@@ -189,7 +191,8 @@ weston_SOURCES = 					\
 	compositor/main.c				\
 	compositor/weston-screenshooter.c		\
 	compositor/text-backend.c			\
-	compositor/xwayland.c
+	compositor/xwayland.c				\
+	compositor/wlrandr.c
 
 # Track this dependency explicitly instead of using BUILT_SOURCES.  We
 # add BUILT_SOURCES to CLEANFILES, but we want to keep git-version.h
@@ -516,7 +519,7 @@ spring_tool_SOURCES =				\
 
 if BUILD_CLIENTS
 
-bin_PROGRAMS += weston-terminal weston-info
+bin_PROGRAMS += weston-terminal weston-info weston-switch-mode
 
 libexec_PROGRAMS +=				\
 	weston-desktop-shell			\
@@ -832,6 +835,15 @@ nodist_weston_info_SOURCES =				\
 weston_info_LDADD = $(WESTON_INFO_LIBS) libshared.la
 weston_info_CFLAGS = $(AM_CFLAGS) $(CLIENT_CFLAGS)
 
+weston_switch_mode_SOURCES =				\
+	clients/switch-mode.c				\
+	shared/helpers.h
+nodist_weston_switch_mode_SOURCES =			\
+	protocol/wlrandr-client-protocol.h		\
+	protocol/wlrandr-protocol.c
+weston_switch_mode_LDADD = $(WESTON_INFO_LIBS) libshared.la
+weston_switch_mode_CFLAGS = $(AM_CFLAGS) $(CLIENT_CFLAGS)
+
 weston_desktop_shell_SOURCES = 				\
 	clients/desktop-shell.c				\
 	shared/helpers.h
@@ -889,7 +901,9 @@ BUILT_SOURCES +=					\
 	protocol/linux-dmabuf-unstable-v1-protocol.c	\
 	protocol/linux-dmabuf-unstable-v1-client-protocol.h		\
 	protocol/input-timestamps-unstable-v1-protocol.c		\
-	protocol/input-timestamps-unstable-v1-client-protocol.h
+	protocol/input-timestamps-unstable-v1-client-protocol.h		\
+	protocol/wlrandr-protocol.c			\
+	protocol/wlrandr-client-protocol.h
 
 westondatadir = $(datadir)/weston
 dist_westondata_DATA =				\
@@ -1541,7 +1555,8 @@ EXTRA_DIST +=					\
 	protocol/text-cursor-position.xml	\
 	protocol/weston-test.xml		\
 	protocol/ivi-application.xml		\
-	protocol/ivi-hmi-controller.xml
+	protocol/ivi-hmi-controller.xml		\
+	protocol/wlrandr.xml
 
 #
 # manual test modules in tests subdirectory
