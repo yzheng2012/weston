@@ -4465,7 +4465,7 @@ drm_output_choose_initial_mode(struct drm_backend *backend,
 	wl_list_for_each_reverse(drm_mode, &output->base.mode_list, base.link) {
 		if (width == drm_mode->base.width &&
 		    height == drm_mode->base.height &&
-		    (refresh == 0 || refresh == drm_mode->mode_info.vrefresh))
+		    (refresh == 0 || refresh == drm_mode->base.refresh))
 			configured = drm_mode;
 
 		if (memcmp(current_mode, &drm_mode->mode_info,
