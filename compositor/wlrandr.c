@@ -63,9 +63,11 @@ wlrandr_switch_mode(struct wl_client *client,
 		    int32_t width, int32_t height, int32_t refresh) {
 	struct weston_output *output =
 		weston_output_from_resource(output_resource);
+	char envname[32];
 	char modeline[16];
 
 	weston_log("switching to %dx%d@%d\n", width, height, refresh);
+	sprintf(envname, "%s-MODE", output->name);
 	if (width == 0 || height == 0)
 		sprintf(modeline, "preferred");
 	else if (refresh)
@@ -85,6 +87,7 @@ wlrandr_switch_mode(struct wl_client *client,
 			break;
 		}
 	} else {
+		setenv(envname, modeline, 1);
 		wlrandr_send_done(resource, WLRANDR_SWITCH_MODE_RESULT_OK);
 	}
 }

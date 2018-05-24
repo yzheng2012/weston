@@ -1052,10 +1052,17 @@ drm_backend_output_configure(struct wl_listener *listener, void *data)
 	char *gbm_format = NULL;
 	char *seat = NULL;
 
+	char envname[16];
+	char *envmodeline;
+
 	if (!api) {
 		weston_log("Cannot use weston_drm_output_api.\n");
 		return;
 	}
+
+	sprintf(envname, "%s-MODE", output->name);
+	envmodeline = getenv(envname);
+	weston_log("get env %s: %s\n", envname, envmodeline);
 
 	section = weston_config_get_section(wc, "output", "name", output->name);
 	weston_config_section_get_string(section, "mode", &s, "preferred");
@@ -1072,12 +1079,17 @@ drm_backend_output_configure(struct wl_listener *listener, void *data)
 	}
 	free(s);
 
+	if (envmodeline) {
+		free(modeline);
+		modeline = envmodeline;
+	}
 	if (api->set_mode(output, mode, modeline) < 0) {
 		weston_log("Cannot configure an output using weston_drm_output_api.\n");
 		free(modeline);
 		return;
 	}
-	free(modeline);
+	if (!envmodeline)
+		free(modeline);
 
 	wet_output_set_scale(output, section, 1, 0);
 	wet_output_set_transform(output, section, WL_OUTPUT_TRANSFORM_NORMAL, UINT32_MAX);
