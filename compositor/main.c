@@ -1060,6 +1060,24 @@ drm_backend_output_configure(struct wl_listener *listener, void *data)
 		return;
 	}
 
+	envmodeline = getenv("WAYLAND_FAKE_UI_SIZE");
+	if (envmodeline) {
+		int32_t width = 0;
+		int32_t height = 0;
+		uint32_t refresh = 0;
+		int n;
+		weston_log("WAYLAND_FAKE_UI_SIZE is %s\n", envmodeline);
+		n = sscanf(envmodeline, "%dx%d@%d", &width, &height, &refresh);
+		if (n == 2 || n == 3) {
+			output->vir_width = width;
+			output->vir_height = height;
+			weston_log("set fake ui size to %d x %d\n",
+				   width, height);
+		} else {
+			weston_log("Invalid WAYLAND_FAKE_UI_SIZE format\n");
+		}
+	}
+
 	sprintf(envname, "%s-MODE", output->name);
 	envmodeline = getenv(envname);
 	weston_log("get env %s: %s\n", envname, envmodeline);

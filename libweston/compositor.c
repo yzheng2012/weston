@@ -4453,13 +4453,24 @@ weston_output_update_matrix(struct weston_output *output)
 static void
 weston_output_transform_scale_init(struct weston_output *output, uint32_t transform, uint32_t scale)
 {
+	int32_t width, height;
+
 	output->transform = transform;
 	output->native_scale = scale;
 	output->current_scale = scale;
 
+	if (output->vir_width)
+		width = output->vir_width;
+	else
+		width = output->current_mode->width;
+	if (output->vir_height)
+		height = output->vir_height;
+	else
+		height = output->current_mode->height;
+
 	convert_size_by_transform_scale(&output->width, &output->height,
-					output->current_mode->width,
-					output->current_mode->height,
+					width,
+					height,
 					transform, scale);
 }
 

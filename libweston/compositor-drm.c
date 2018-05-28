@@ -1736,6 +1736,10 @@ drm_output_render(struct drm_output_state *state, pixman_region32_t *damage)
 	scanout_state->dest_w = scanout_state->src_w >> 16;
 	scanout_state->dest_h = scanout_state->src_h >> 16;
 
+	if (output->base.vir_width)
+		scanout_state->src_w = output->base.vir_width << 16;
+	if (output->base.vir_height)
+		scanout_state->src_h = output->base.vir_height << 16;
 
 	pixman_region32_subtract(&c->primary_plane.damage,
 				 &c->primary_plane.damage, damage);
@@ -2973,6 +2977,13 @@ drm_output_prepare_cursor_view(struct drm_output_state *output_state,
 	plane_state->dest_w = b->cursor_width;
 	plane_state->dest_h = b->cursor_height;
 
+	if (output->base.vir_width &&
+	    output->base.current_mode->width != output->base.vir_width)
+		plane_state->dest_x = plane_state->dest_x * output->base.current_mode->width / output->base.vir_width;
+	if (output->base.vir_height &&
+	    output->base.current_mode->height != output->base.vir_height)
+		plane_state->dest_y = plane_state->dest_y * output->base.current_mode->height / output->base.vir_height;
+
 	if (needs_update)
 		cursor_bo_update(b, plane_state->fb->bo, ev);
 
@@ -4036,10 +4047,19 @@ drm_output_init_egl(struct drm_output *output, struct drm_backend *b)
 		fallback_format_for(output->gbm_format),
 	};
 	int n_formats = 1;
+	int32_t width, height;
 
+	if (output->base.vir_width)
+		width = output->base.vir_width;
+	else
+		width = output->base.current_mode->width;
+	if (output->base.vir_height)
+		height = output->base.vir_height;
+	else
+		height = output->base.current_mode->height;
 	output->gbm_surface = gbm_surface_create(b->gbm,
-					     output->base.current_mode->width,
-					     output->base.current_mode->height,
+					     width,
+					     height,
 					     format[0],
 					     GBM_BO_USE_SCANOUT |
 					     GBM_BO_USE_RENDERING);
@@ -5537,9 +5557,14 @@ recorder_binding(struct weston_keyboard *keyboard, const struct timespec *time,
 				   "output format not supported\n");
 			return;
 		}
-
-		width = output->base.current_mode->width;
-		height = output->base.current_mode->height;
+		if (output->base.vir_width)
+			width = output->base.vir_width;
+		else
+			width = output->base.current_mode->width;
+		if (output->base.vir_height)
+			height = output->base.vir_height;
+		else
+			height = output->base.current_mode->height;
 
 		output->recorder =
 			create_recorder(b, width, height, "capture.h264");

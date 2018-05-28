@@ -1092,6 +1092,7 @@ draw_output_borders(struct weston_output *output,
 	struct gl_border_image *top, *bottom, *left, *right;
 	struct weston_matrix matrix;
 	int full_width, full_height;
+	int width, height;
 
 	if (border_status == BORDER_STATUS_CLEAN)
 		return; /* Clean. Nothing to do. */
@@ -1101,8 +1102,17 @@ draw_output_borders(struct weston_output *output,
 	left = &go->borders[GL_RENDERER_BORDER_LEFT];
 	right = &go->borders[GL_RENDERER_BORDER_RIGHT];
 
-	full_width = output->current_mode->width + left->width + right->width;
-	full_height = output->current_mode->height + top->height + bottom->height;
+	if (output->vir_width)
+		width = output->vir_width;
+	else
+		width = output->current_mode->width;
+	if (output->vir_height)
+		height = output->vir_height;
+	else
+		height = output->current_mode->height;
+
+	full_width = width + left->width + right->width;
+	full_height = height + top->height + bottom->height;
 
 	glDisable(GL_BLEND);
 	use_shader(gr, shader);
@@ -1144,6 +1154,7 @@ output_get_border_damage(struct weston_output *output,
 	struct gl_output_state *go = get_output_state(output);
 	struct gl_border_image *top, *bottom, *left, *right;
 	int full_width, full_height;
+	int width, height;
 
 	if (border_status == BORDER_STATUS_CLEAN)
 		return; /* Clean. Nothing to do. */
@@ -1153,8 +1164,17 @@ output_get_border_damage(struct weston_output *output,
 	left = &go->borders[GL_RENDERER_BORDER_LEFT];
 	right = &go->borders[GL_RENDERER_BORDER_RIGHT];
 
-	full_width = output->current_mode->width + left->width + right->width;
-	full_height = output->current_mode->height + top->height + bottom->height;
+	if (output->vir_width)
+		width = output->vir_width;
+	else
+		width = output->current_mode->width;
+	if (output->vir_height)
+		height = output->vir_height;
+	else
+		height = output->current_mode->height;
+
+	full_width = width + left->width + right->width;
+	full_height = height + top->height + bottom->height;
 	if (border_status & BORDER_TOP_DIRTY)
 		pixman_region32_union_rect(damage, damage,
 					   0, 0,
@@ -1254,26 +1274,36 @@ gl_renderer_repaint_output(struct weston_output *output,
 	pixman_region32_t buffer_damage, total_damage;
 	enum gl_border_status border_damage = BORDER_STATUS_CLEAN;
 	EGLSyncKHR begin_render_sync, end_render_sync;
+	int width, height;
 
 	if (use_output(output) < 0)
 		return;
 
 	begin_render_sync = timeline_create_render_sync(gr);
 
+	if (output->vir_width)
+		width = output->vir_width;
+	else
+		width = output->current_mode->width;
+	if (output->vir_height)
+		height = output->vir_height;
+	else
+		height = output->current_mode->height;
+
 	/* Calculate the viewport */
 	glViewport(go->borders[GL_RENDERER_BORDER_LEFT].width,
 		   go->borders[GL_RENDERER_BORDER_BOTTOM].height,
-		   output->current_mode->width,
-		   output->current_mode->height);
+		   width,
+		   height);
 
 	/* Calculate the global GL matrix */
 	go->output_matrix = output->matrix;
 	weston_matrix_translate(&go->output_matrix,
-				-(output->current_mode->width / 2.0),
-				-(output->current_mode->height / 2.0), 0);
+				-(width / 2.0),
+				-(height / 2.0), 0);
 	weston_matrix_scale(&go->output_matrix,
-			    2.0 / output->current_mode->width,
-			    -2.0 / output->current_mode->height, 1);
+			    2.0 / width,
+			    -2.0 / height, 1);
 
 	/* if debugging, redraw everything outside the damage to clean up
 	 * debug lines from the previous draw on this buffer:
@@ -1329,7 +1359,7 @@ gl_renderer_repaint_output(struct weston_output *output,
 		egl_damage = malloc(nrects * 4 * sizeof(EGLint));
 
 		buffer_height = go->borders[GL_RENDERER_BORDER_TOP].height +
-				output->current_mode->height +
+				height +
 				go->borders[GL_RENDERER_BORDER_BOTTOM].height;
 
 		d = egl_damage;

@@ -240,6 +240,9 @@ struct weston_output {
 
 	int (*enable)(struct weston_output *output);
 	int (*disable)(struct weston_output *output);
+
+	/* used for fixed frame buffer */
+	int32_t vir_width, vir_height;
 };
 
 enum weston_pointer_motion_mask {
