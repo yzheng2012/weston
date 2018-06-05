@@ -54,8 +54,60 @@
 		summary="the requested mode was not available"/>
     </enum>
 
+    <enum name="event_list">
+	<entry name="event_switch_mode" value="0"
+		summary="event for switch mode"/>
+	<entry name="event_get_output_name" value="1"
+		summary="event for get output name"/>
+	<entry name="event_get_mode_list" value="2"
+		summary="event for get mode list"/>
+	<entry name="event_get_cur_mode" value="3"
+		summary="event for get current mode"/>
+    </enum>
+
     <event name="done">
+	<arg name='event_type' type='uint'/>
 	<arg name='result' type='uint'/>
+    </event>
+
+    <request name="get_output_name">
+      <description summary="get device type">
+        Asks weston to get output name for the given output.
+      </description>
+
+      <arg name="output" type="object" interface="wl_output"/>
+    </request>
+
+    <event name="output_name">
+      <arg name='name' type="string"/>
+      <arg name='make' type="string"/>
+      <arg name='model' type="string"/>
+    </event>
+
+	<request name="get_output_mode_list">
+      <description summary="get mode list">
+        Asks weston to get modelist for the given output.
+      </description>
+      <arg name="output" type="object" interface="wl_output"/>
+    </request>
+
+    <event name="mode">
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+      <arg name="refresh" type="int"/>
+    </event>
+
+    <request name="get_current_mode">
+      <description summary="get current mode">
+        Asks weston to get modelist for the given output.
+      </description>
+      <arg name="output" type="object" interface="wl_output"/>
+    </request>
+
+    <event name="current_mode">
+      <arg name="width" type="int"/>
+      <arg name="height" type="int"/>
+      <arg name="refresh" type="int"/>
     </event>
   </interface>
 

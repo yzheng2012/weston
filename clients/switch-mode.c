@@ -33,81 +33,96 @@
 
 static struct wl_list output_list;
 static struct wlrandr *wlRandr;
+
 int mode_switched;
+uint32_t mode_list_getd;
+uint32_t current_mode_getd;
+uint32_t output_name_getd;
+uint32_t switch_result;
 uint32_t switch_result;
 
 struct randr_mode {
-	int width, height, refresh, flags;
+	int width, height, refresh;
 	struct wl_list link;
 };
 
 struct randr_output {
 	struct wl_output *output;
 	int transform;
+	uint32_t id;
+	char *output_name;
 	char *make;
 	char *model;
+	struct randr_mode current_mode;
 	struct wl_list modes;
 
 	struct wl_list link;
 };
 
-
-
 static void
-switch_mode_done(void *data, struct wlrandr *wlrander, uint32_t result)
+result_done(void *data, struct wlrandr *wlrander, uint32_t type, uint32_t result)
 {
-	mode_switched = 1;
+	if (type == WLRANDR_EVENT_LIST_EVENT_SWITCH_MODE)
+		mode_switched = 1;
+	else if (type == WLRANDR_EVENT_LIST_EVENT_GET_MODE_LIST)
+		mode_list_getd = 1;
+	else if (type == WLRANDR_EVENT_LIST_EVENT_GET_CUR_MODE)
+		current_mode_getd = 1;
 	switch_result = result;
 }
 
-static const struct wlrandr_listener wlrander_listener = {
-		switch_mode_done
-};
-
 static void
-display_handle_geometry(void *data,
-			struct wl_output *wl_output,
-			int x,
-			int y,
-			int physical_width,
-			int physical_height,
-			int subpixel,
-			const char *make,
-			const char *model,
-			int transform)
+handle_output_device(void *data,
+		     struct wlrandr *wlrandr,
+		     const char *name,
+		     const char* make,
+		     const char* model)
 {
-	struct randr_output *output;
-	output = wl_output_get_user_data(wl_output);
+	struct randr_output *output = data;
+
+	output->output_name = strdup(name);
 	output->make = strdup(make);
 	output->model = strdup(model);
-	output->transform = transform;
-}
+	output_name_getd = 1;
+ }
 
 static void
-display_handle_mode(void *data,
-		    struct wl_output *wl_output,
-		    uint32_t flags,
-		    int width,
-		    int height,
-		    int refresh)
+handle_mode(void *data,
+	    struct wlrandr *wlrandr,
+	    int32_t width,
+	    int32_t height,
+	    int32_t refresh)
 {
-	struct randr_output *output;
 	struct randr_mode *mode;
+	struct randr_output *output = data;
 
-	output = wl_output_get_user_data(wl_output);
 	mode = malloc(sizeof *mode);
 	mode->width = width;
 	mode->height = height;
 	mode->refresh = refresh;
-	mode->flags = flags;
 	wl_list_insert(&output->modes, &mode->link);
 }
 
-static const struct wl_output_listener output_listener = {
-	display_handle_geometry,
-	display_handle_mode
-};
+static void
+handle_current_mode(void *data,
+		    struct wlrandr *wlrandr,
+		    int32_t width,
+		    int32_t height,
+		    int32_t refresh)
+{
+	struct randr_output *output = data;
 
+	output->current_mode.width = width;
+	output->current_mode.height = height;
+	output->current_mode.refresh = refresh;
+}
+
+static struct wlrandr_listener wlrander_listener = {
+	result_done,
+	handle_output_device,
+	handle_mode,
+	handle_current_mode,
+};
 
 static void
 handle_global(void *data, struct wl_registry *registry,
@@ -120,7 +135,6 @@ handle_global(void *data, struct wl_registry *registry,
 		output->output = wl_registry_bind(registry, name, &wl_output_interface, 1);
 		wl_list_init(&output->modes);
 		wl_list_insert(&output_list, &output->link);
-		wl_output_add_listener(output->output, &output_listener, output);
 	} else if (strcmp(interface, "wlrandr") == 0) {
 		wlRandr = wl_registry_bind(registry, name, &wlrandr_interface, 1);
 	}
@@ -172,7 +186,7 @@ find_output(const char *name) {
 	struct randr_output *ret;
 
 	wl_list_for_each(ret, &output_list, link) {
-		if(strcmp(ret->model, name) == 0)
+		if(strcmp(ret->output_name, name) == 0)
 			return ret;
 	}
 	return 0;
@@ -181,13 +195,16 @@ find_output(const char *name) {
 static void
 print_available_modes(struct randr_output *output) {
 	struct randr_mode *mode;
-	fprintf(stderr, "%s %s:\n", output->make, output->model);
+	fprintf(stderr, "%s %s %s:\n", output->output_name, output->make, output->model);
 	wl_list_for_each(mode, &output->modes, link) {
-		fprintf(stderr, "  %s%dx%d\t%d\n", (mode->flags & WL_OUTPUT_MODE_CURRENT) ? "*" : "",
-				mode->width, mode->height, mode->refresh);
+		fprintf(stderr, "  %dx%d\t%d\n",
+			mode->width, mode->height, mode->refresh);
 	}
+	fprintf(stderr, "curmode:  %dx%d\t%d\n",
+		output->current_mode.width,
+		output->current_mode.height,
+		output->current_mode.refresh);
 }
-
 
 int main(int argc, char *argv[])
 {
@@ -229,7 +246,25 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	wlrandr_add_listener(wlRandr, &wlrander_listener, wlRandr);
+	wl_list_for_each(output, &output_list, link)
+		wlrandr_add_listener(wlRandr, &wlrander_listener, output);
+
+	wl_list_for_each(output, &output_list, link) {
+		output_name_getd = 0;
+		wlrandr_get_output_name(wlRandr, output->output);
+		while (!output_name_getd)
+			wl_display_roundtrip(display);
+
+		mode_list_getd = 0;
+		wlrandr_get_output_mode_list(wlRandr, output->output);
+		while (!mode_list_getd)
+			wl_display_roundtrip(display);
+
+		current_mode_getd = 0;
+		wlrandr_get_current_mode(wlRandr, output->output);
+		while (!current_mode_getd)
+			wl_display_roundtrip(display);
+	}
 
 	if(output_name) {
 		output = find_output(output_name);
@@ -239,6 +274,9 @@ int main(int argc, char *argv[])
 		}
 	} else {
 		if(wl_list_length(&output_list) != 1) {
+			printf("output:\n");
+			wl_list_for_each(output, &output_list, link)
+				printf("  %s\n", output->output_name);
 			fprintf(stderr, "multiple output detected, you should specify the "
 					"target output with --output <output>\n");
 			exit(EXIT_FAILURE);
@@ -272,11 +310,6 @@ int main(int argc, char *argv[])
 	if(!mode_found) {
 		fprintf(stderr, "mode %dx%d not available\n", width, height);
 		exit(EXIT_FAILURE);
-	}
-
-	if(mode->flags & WL_OUTPUT_MODE_CURRENT) {
-		fprintf(stderr, "mode %dx%d is already the current mode\n", width, height);
-		exit(0);
 	}
 
 	if(refresh < 0)

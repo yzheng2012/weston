@@ -79,21 +79,84 @@ wlrandr_switch_mode(struct wl_client *client,
 	if(ret < 0) {
 		switch(ret) {
 		case -ENOENT:
-			wlrandr_send_done(resource, WLRANDR_SWITCH_MODE_RESULT_NOT_AVAILABLE);
+			wlrandr_send_done(resource,
+					  WLRANDR_EVENT_LIST_EVENT_SWITCH_MODE,
+					  WLRANDR_SWITCH_MODE_RESULT_NOT_AVAILABLE);
 			break;
 		default:
 			/* generic error */
-			wlrandr_send_done(resource, WLRANDR_SWITCH_MODE_RESULT_FAILED);
+			wlrandr_send_done(resource,
+					  WLRANDR_EVENT_LIST_EVENT_SWITCH_MODE,
+					  WLRANDR_SWITCH_MODE_RESULT_FAILED);
 			break;
 		}
 	} else {
 		setenv(envname, modeline, 1);
-		wlrandr_send_done(resource, WLRANDR_SWITCH_MODE_RESULT_OK);
+		wlrandr_send_done(resource,
+				  WLRANDR_EVENT_LIST_EVENT_SWITCH_MODE,
+				  WLRANDR_SWITCH_MODE_RESULT_OK);
 	}
 }
 
+static void
+wlrandr_get_output_name(struct wl_client *client,
+			struct wl_resource *resource,
+			struct wl_resource *output)
+{
+	struct weston_output *w_output =
+		weston_output_from_resource(output);
+
+	if (w_output)
+		wlrandr_send_output_name(resource, w_output->name,
+					 w_output->make, w_output->model);
+	else
+		wlrandr_send_output_name(resource, NULL, NULL, NULL);
+}
+
+static void
+wlrandr_get_mode_list(struct wl_client *client,
+		      struct wl_resource *resource,
+		      struct wl_resource *output)
+{
+	struct weston_output *w_output =
+		weston_output_from_resource(output);
+	struct weston_mode *mode;
+
+	wl_list_for_each(mode, &w_output->mode_list, link) {
+		wlrandr_send_mode(resource,
+				mode->width,
+				mode->height,
+				mode->refresh);
+	}
+
+	wlrandr_send_done(resource, WLRANDR_EVENT_LIST_EVENT_GET_MODE_LIST, 0);
+}
+
+static void
+wlrandr_get_current_mode(struct wl_client *client,
+			 struct wl_resource *resource,
+			 struct wl_resource *output)
+{
+	struct weston_output *w_output =
+		weston_output_from_resource(output);
+	struct weston_mode *mode;
+
+	wl_list_for_each(mode, &w_output->mode_list, link) {
+		if (mode->flags & WL_OUTPUT_MODE_CURRENT)
+			wlrandr_send_current_mode(resource,
+						  mode->width,
+						  mode->height,
+						  mode->refresh);
+	}
+
+	wlrandr_send_done(resource, WLRANDR_EVENT_LIST_EVENT_GET_CUR_MODE, 0);
+}
+
 struct wlrandr_interface wlrandr_implementation = {
-	wlrandr_switch_mode
+	wlrandr_switch_mode,
+	wlrandr_get_output_name,
+	wlrandr_get_mode_list,
+	wlrandr_get_current_mode
 };
 
 static void

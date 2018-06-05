@@ -835,6 +835,16 @@ nodist_weston_info_SOURCES =				\
 weston_info_LDADD = $(WESTON_INFO_LIBS) libshared.la
 weston_info_CFLAGS = $(AM_CFLAGS) $(CLIENT_CFLAGS)
 
+lib_LTLIBRARIES += libweston-outputmanager.la
+libweston_outputmanager_la_SOURCES = \
+    liboutputmanager/wlrandr_output_manager.h \
+    liboutputmanager/wlrandr_output_manager.c
+nodist_libweston_outputmanager_la_SOURCES =         \
+    protocol/wlrandr-client-protocol.h      \
+    protocol/wlrandr-protocol.c
+libweston_outputmanager_la_LIBADD = $(WESTON_INFO_LIBS)
+libweston_outputmanager_CFLAGS = $(AM_CFLAGS) $(CLIENT_CFLAGS)
+
 weston_switch_mode_SOURCES =				\
 	clients/switch-mode.c				\
 	shared/helpers.h
