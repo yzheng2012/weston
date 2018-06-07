@@ -94,6 +94,7 @@ enum weston_led {
 
 struct weston_mode {
 	uint32_t flags;
+	uint32_t drm_flags;
 	int32_t width, height;
 	uint32_t refresh;
 	struct wl_list link;

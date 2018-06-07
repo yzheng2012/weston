@@ -7,6 +7,7 @@
 
 struct wlrandr_output_mode{
 	int width, height, refresh;
+	uint32_t flags;
 };
 struct wlrandr_output_list{
 	char* name;

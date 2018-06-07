@@ -3729,6 +3729,7 @@ drm_output_add_mode(struct drm_output *output, const drmModeModeInfo *info)
 
 	if (info->type & DRM_MODE_TYPE_PREFERRED)
 		mode->base.flags |= WL_OUTPUT_MODE_PREFERRED;
+	mode->base.drm_flags = info->flags;
 
 	wl_list_insert(output->base.mode_list.prev, &mode->base.link);
 
@@ -4444,11 +4445,12 @@ drm_output_choose_initial_mode(struct drm_backend *backend,
 	int32_t width = 0;
 	int32_t height = 0;
 	uint32_t refresh = 0;
+	uint32_t target_flags = 0;
 	int n;
 
 	if (mode == WESTON_DRM_BACKEND_OUTPUT_PREFERRED && modeline) {
-		n = sscanf(modeline, "%dx%d@%d", &width, &height, &refresh);
-		if (n != 2 && n != 3) {
+		n = sscanf(modeline, "%dx%d@%d-%d", &width, &height, &refresh, &target_flags);
+		if (n != 2 && n != 3 && n != 4) {
 			width = -1;
 
 			if (parse_modeline(modeline, &drm_modeline) == 0) {
@@ -4463,8 +4465,12 @@ drm_output_choose_initial_mode(struct drm_backend *backend,
 	}
 
 	wl_list_for_each_reverse(drm_mode, &output->base.mode_list, base.link) {
+		uint32_t interlaced =
+			drm_mode->mode_info.flags & DRM_MODE_FLAG_INTERLACE;
+
 		if (width == drm_mode->base.width &&
 		    height == drm_mode->base.height &&
+		    target_flags == interlaced &&
 		    (refresh == 0 || refresh == drm_mode->base.refresh))
 			configured = drm_mode;
 

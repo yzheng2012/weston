@@ -9,6 +9,7 @@
 
 struct randr_mode {
 	int width, height, refresh;
+	uint32_t flags;
 	struct wl_list link;
 };
 
@@ -77,7 +78,8 @@ handle_mode(void *data,
 	    struct wlrandr *wlrandr,
 	    int32_t width,
 	    int32_t height,
-	    int32_t refresh)
+	    int32_t refresh,
+	    uint32_t flags)
 {
 	struct randr_mode *mode;
 	struct randr_output *output = data;
@@ -86,6 +88,7 @@ handle_mode(void *data,
 	mode->width = width;
 	mode->height = height;
 	mode->refresh = refresh;
+	mode->flags = flags;
 	wl_list_insert(&output->wl_modes, &mode->link);
 }
 
@@ -232,6 +235,7 @@ wlrandr_get_mode_list(char* output_name, int* numofmodes)
 			outputmodes[i].width = mode->width;
 			outputmodes[i].height = mode->height;
 			outputmodes[i].refresh = mode->refresh;
+			outputmodes[i].flags = mode->flags;
 			i++;
 		}
 	}
@@ -273,6 +277,7 @@ wlrandr_get_curmode(char* output_name, struct wlrandr_output_mode *outputmode)
 	outputmode->width = output->current_mode.width;
 	outputmode->height = output->current_mode.height;
 	outputmode->refresh = output->current_mode.refresh;
+	outputmode->flags = output->current_mode.flags;
 
 	pthread_mutex_unlock(&lock_);
 
@@ -303,7 +308,7 @@ wlrandr_set_mode(char* output_name, struct wlrandr_output_mode *outputmode)
 	event_ret.mode_switched = 0;
 	wlrandr_switch_mode(m_output_info.wlrandr, output->output,
 			    outputmode->width, outputmode->height,
-			    outputmode->refresh);
+			    outputmode->refresh, outputmode->flags);
 	ret = wlrandr_wait_result_timeout(WLRANDR_EVENT_LIST_EVENT_SWITCH_MODE);
 
 	pthread_mutex_unlock(&lock_);

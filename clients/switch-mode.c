@@ -25,6 +25,10 @@
 #include <string.h>
 
 #include <wayland-client.h>
+
+#include <xf86drm.h>
+#include <xf86drmMode.h>
+
 #include "wlrandr-client-protocol.h"
 #include "../shared/config-parser.h"
 #include "../shared/os-compatibility.h"
@@ -43,6 +47,7 @@ uint32_t switch_result;
 
 struct randr_mode {
 	int width, height, refresh;
+	uint32_t flags;
 	struct wl_list link;
 };
 
@@ -91,7 +96,8 @@ handle_mode(void *data,
 	    struct wlrandr *wlrandr,
 	    int32_t width,
 	    int32_t height,
-	    int32_t refresh)
+	    int32_t refresh,
+	    uint32_t flags)
 {
 	struct randr_mode *mode;
 	struct randr_output *output = data;
@@ -100,6 +106,7 @@ handle_mode(void *data,
 	mode->width = width;
 	mode->height = height;
 	mode->refresh = refresh;
+	mode->flags = flags;
 	wl_list_insert(&output->modes, &mode->link);
 }
 
@@ -108,13 +115,15 @@ handle_current_mode(void *data,
 		    struct wlrandr *wlrandr,
 		    int32_t width,
 		    int32_t height,
-		    int32_t refresh)
+		    int32_t refresh,
+		    uint32_t flags)
 {
 	struct randr_output *output = data;
 
 	output->current_mode.width = width;
 	output->current_mode.height = height;
 	output->current_mode.refresh = refresh;
+	output->current_mode.flags = flags;
 }
 
 static struct wlrandr_listener wlrander_listener = {
@@ -179,6 +188,7 @@ usage(char *argv[]) {
 	fprintf(stderr, "  --mode <width>x<height>\n");
 	fprintf(stderr, "  --refresh <rate> or -r <rate> or --rate <rate>\n");
 	fprintf(stderr, "  --output <output>\n");
+	fprintf(stderr, "  --interlaced <interlaced>\n");
 }
 
 static struct randr_output *
@@ -195,10 +205,13 @@ find_output(const char *name) {
 static void
 print_available_modes(struct randr_output *output) {
 	struct randr_mode *mode;
-	fprintf(stderr, "%s %s %s:\n", output->output_name, output->make, output->model);
+
+	fprintf(stderr, "dev:%s  make:%s %s:\n", output->output_name, output->make, output->model);
 	wl_list_for_each(mode, &output->modes, link) {
-		fprintf(stderr, "  %dx%d\t%d\n",
-			mode->width, mode->height, mode->refresh);
+		fprintf(stderr, "  %dx%d%c\t%d\n",
+			mode->width, mode->height,
+			mode->flags & DRM_MODE_FLAG_INTERLACE ? 'i' : 'p',
+			mode->refresh);
 	}
 	fprintf(stderr, "curmode:  %dx%d\t%d\n",
 		output->current_mode.width,
@@ -216,13 +229,14 @@ int main(int argc, char *argv[])
 
 	char *mode_string= NULL;
 	char *output_name = NULL;
-	int width, height, refresh = -1;
+	int width, height, refresh = -1, interlaced;
 
 	const struct weston_option options[] = {
 		{ WESTON_OPTION_STRING,  "mode", 0, &mode_string },
 		{ WESTON_OPTION_STRING,  "output", 0, &output_name },
 		{ WESTON_OPTION_UNSIGNED_INTEGER,  "rate", 0, &refresh },
-		{ WESTON_OPTION_UNSIGNED_INTEGER,  "refresh", 0, &refresh }
+		{ WESTON_OPTION_UNSIGNED_INTEGER,  "refresh", 0, &refresh },
+		{ WESTON_OPTION_UNSIGNED_INTEGER,  "interlaced", 0, &interlaced }
 	};
 
 	if(parse_options(options, ARRAY_LENGTH(options), &argc, argv) < 0) {
@@ -314,7 +328,13 @@ int main(int argc, char *argv[])
 
 	if(refresh < 0)
 		refresh = 0;
-	wlrandr_switch_mode(wlRandr, output->output, width, height, refresh);
+
+	if (interlaced > 0)
+		interlaced = DRM_MODE_FLAG_INTERLACE;
+	else
+		interlaced = 0;
+
+	wlrandr_switch_mode(wlRandr, output->output, width, height, refresh, interlaced);
 	mode_switched = 0;
 	while (!mode_switched)
 		wl_display_roundtrip(display);
@@ -327,7 +347,8 @@ int main(int argc, char *argv[])
 		fprintf(stderr, "mode not available in weston\n");
 		break;
 	default:
-		printf("successfully switch to mode %dx%d-%d\n", width, height, refresh);
+		printf("successfully switch to mode %dx%d%c-%d\n",
+		       width, height, interlaced ? 'i' : 'p', refresh);
 		break;
 	}
 	return 0;

@@ -39,6 +39,7 @@
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
       <arg name="refresh" type="int"/>
+      <arg name="flags" type="uint"/>
     </request>
 
     <enum name="switch_mode_result">
@@ -84,7 +85,7 @@
       <arg name='model' type="string"/>
     </event>
 
-	<request name="get_output_mode_list">
+    <request name="get_output_mode_list">
       <description summary="get mode list">
         Asks weston to get modelist for the given output.
       </description>
@@ -95,6 +96,7 @@
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
       <arg name="refresh" type="int"/>
+      <arg name="flags" type="uint"/>
     </event>
 
     <request name="get_current_mode">
@@ -108,6 +110,7 @@
       <arg name="width" type="int"/>
       <arg name="height" type="int"/>
       <arg name="refresh" type="int"/>
+      <arg name="flags" type="uint"/>
     </event>
   </interface>
 

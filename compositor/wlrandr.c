@@ -60,18 +60,20 @@ static void
 wlrandr_switch_mode(struct wl_client *client,
 		    struct wl_resource *resource,
 		    struct wl_resource *output_resource,
-		    int32_t width, int32_t height, int32_t refresh) {
+		    int32_t width, int32_t height, int32_t refresh,
+		    uint32_t flags) {
 	struct weston_output *output =
 		weston_output_from_resource(output_resource);
 	char envname[32];
 	char modeline[16];
 
-	weston_log("switching to %dx%d@%d\n", width, height, refresh);
+	weston_log("switching to %dx%d@%d flags 0x%x\n",
+		   width, height, refresh, flags);
 	sprintf(envname, "%s-MODE", output->name);
 	if (width == 0 || height == 0)
 		sprintf(modeline, "preferred");
 	else if (refresh)
-		sprintf(modeline, "%dx%d@%d", width, height, refresh);
+		sprintf(modeline, "%dx%d@%d-%d", width, height, refresh, flags);
 	else
 		sprintf(modeline, "%dx%d", width, height);
 
@@ -124,9 +126,10 @@ wlrandr_get_mode_list(struct wl_client *client,
 
 	wl_list_for_each(mode, &w_output->mode_list, link) {
 		wlrandr_send_mode(resource,
-				mode->width,
-				mode->height,
-				mode->refresh);
+				  mode->width,
+				  mode->height,
+				  mode->refresh,
+				  mode->drm_flags);
 	}
 
 	wlrandr_send_done(resource, WLRANDR_EVENT_LIST_EVENT_GET_MODE_LIST, 0);
@@ -146,7 +149,8 @@ wlrandr_get_current_mode(struct wl_client *client,
 			wlrandr_send_current_mode(resource,
 						  mode->width,
 						  mode->height,
-						  mode->refresh);
+						  mode->refresh,
+						  mode->drm_flags);
 	}
 
 	wlrandr_send_done(resource, WLRANDR_EVENT_LIST_EVENT_GET_CUR_MODE, 0);

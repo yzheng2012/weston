@@ -852,7 +852,7 @@ nodist_weston_switch_mode_SOURCES =			\
 	protocol/wlrandr-client-protocol.h		\
 	protocol/wlrandr-protocol.c
 weston_switch_mode_LDADD = $(WESTON_INFO_LIBS) libshared.la
-weston_switch_mode_CFLAGS = $(AM_CFLAGS) $(CLIENT_CFLAGS)
+weston_switch_mode_CFLAGS = $(AM_CFLAGS) $(CLIENT_CFLAGS) $(LIBDRM_CFLAGS)
 
 weston_desktop_shell_SOURCES = 				\
 	clients/desktop-shell.c				\
