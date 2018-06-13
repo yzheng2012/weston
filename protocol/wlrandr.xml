@@ -112,6 +112,15 @@
       <arg name="refresh" type="int"/>
       <arg name="flags" type="uint"/>
     </event>
+
+    <request name="save_config">
+      <description summary="save config to baseparameter">
+        Asks weston to get modelist for the given output.
+      </description>
+      <arg name="output" type="object" interface="wl_output"/>
+      <arg name="dpy" type="uint"/>
+    </request>
+
   </interface>
 
 </protocol>

@@ -19,22 +19,88 @@
  * CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+#include <fcntl.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <errno.h>
+#include <unistd.h>
 
+#include <xf86drm.h>
+#include <xf86drmMode.h>
+
+#include "baseparameter.h"
 #include "compositor.h"
 #include "compositor-drm.h"
+#include "shared/helpers.h"
 #include "weston.h"
 #include "wlrandr-server-protocol.h"
-#include "shared/helpers.h"
 
 struct wlrandr_impl {
 	struct weston_compositor *ec;
 	struct wl_global *global;
 	struct wl_listener destroy_listener;
 };
+
+struct drm_mode {
+	struct weston_mode base;
+	drmModeModeInfo mode_info;
+	uint32_t blob_id;
+};
+
+static char const *const device_template[] =
+{
+	"/dev/block/platform/1021c000.dwmmc/by-name/baseparameter",
+	"/dev/block/platform/30020000.dwmmc/by-name/baseparameter",
+	"/dev/block/platform/fe330000.sdhci/by-name/baseparameter",
+	"/dev/block/platform/ff520000.dwmmc/by-name/baseparameter",
+	"/dev/block/platform/ff0f0000.dwmmc/by-name/baseparameter",
+	"/dev/block/rknand_baseparameter",
+	NULL
+};
+
+static const char*
+get_baseparam_file(void)
+{
+	int i = 0;
+
+	while (device_template[i]) {
+		if (!access(device_template[i], R_OK | W_OK))
+			return device_template[i];
+		i++;
+	}
+	return NULL;
+}
+
+static struct screen_info*
+find_suitable_info_slot(int dpy, struct file_base_paramer* base_param, int type)
+{
+	struct disp_info* info;
+	int found = 0;
+
+	if (dpy == 0)
+		info = &base_param->main;
+	else
+		info = &base_param->aux;
+
+	for (int i = 0; i < 5; i++) {
+		if (info->screen_list[i].type != 0 &&
+		    info->screen_list[i].type == type) {
+			found = i;
+			break;
+		} else if (info->screen_list[i].type !=0 && found == false) {
+			found++;
+		}
+	}
+
+	if (found == -1)
+		found = 0;
+
+	weston_log("findSuitableInfoSlot: %d type=%d", found, type);
+
+	return &info->screen_list[found];
+}
 
 static int
 wlrandr_set_mode(struct weston_output *output, char *modeline)
@@ -156,11 +222,84 @@ wlrandr_get_current_mode(struct wl_client *client,
 	wlrandr_send_done(resource, WLRANDR_EVENT_LIST_EVENT_GET_CUR_MODE, 0);
 }
 
+static void
+wlrandr_save_config(struct wl_client *client,
+                   struct wl_resource *resource,
+                   struct wl_resource *output,
+                   uint32_t dpy)
+{
+	struct weston_output *w_output = weston_output_from_resource(output);
+	struct file_base_paramer base_paramer;
+	const char *baseparameterfile = get_baseparam_file();
+	struct drm_mode *mode = NULL;
+	uint32_t file = 0, length = 0;
+
+	if (!baseparameterfile) {
+		sync();
+		return;
+	}
+
+	file = open(baseparameterfile, O_RDWR);
+		if (file <= 0) {
+			sync();
+		return;
+	}
+
+	length = lseek(file, 0L, SEEK_END);
+	lseek(file, 0L, SEEK_SET);
+	if(length < sizeof(base_paramer)) {
+		sync();
+		close(file);
+		return;
+	}
+
+	read(file, (void*)&(base_paramer.main), sizeof(base_paramer.main));
+	lseek(file, BASE_OFFSET, SEEK_SET);
+	read(file, (void*)&(base_paramer.aux), sizeof(base_paramer.aux));
+
+	mode = container_of(w_output->current_mode, struct drm_mode, base);
+	if (mode == NULL) {
+		close(file);
+		return;
+	}
+
+	struct screen_info* mslot =
+		find_suitable_info_slot(dpy, &base_paramer,
+					mode->mode_info.type);
+
+	mslot->type = mode->mode_info.type;
+	mslot->mode.hdisplay = mode->mode_info.hdisplay;
+	mslot->mode.vdisplay= mode->mode_info.vdisplay;
+	mslot->mode.hsync_start = mode->mode_info.hsync_start;
+	mslot->mode.hsync_end = mode->mode_info.hsync_end;
+	mslot->mode.vsync_start = mode->mode_info.vsync_end;
+	mslot->mode.vsync_end = mode->mode_info.vsync_end;
+	mslot->mode.clock = mode->mode_info.clock;
+	mslot->mode.vtotal = mode->mode_info.vtotal;
+	mslot->mode.htotal= mode->mode_info.htotal;
+	mslot->mode.vscan = mode->mode_info.vscan;
+	mslot->mode.flags = mode->mode_info.flags;
+
+	if (dpy == 0) {
+		lseek(file, 0L, SEEK_SET);
+		write(file, (char*)(&base_paramer.main), sizeof(base_paramer.main));
+	} else {
+		lseek(file, BASE_OFFSET, SEEK_SET);
+		write(file, (char*)(&base_paramer.aux), sizeof(base_paramer.aux));
+	}
+
+	close(file);
+	sync();
+}
+
+
+
 struct wlrandr_interface wlrandr_implementation = {
 	wlrandr_switch_mode,
 	wlrandr_get_output_name,
 	wlrandr_get_mode_list,
-	wlrandr_get_current_mode
+	wlrandr_get_current_mode,
+	wlrandr_save_config
 };
 
 static void
