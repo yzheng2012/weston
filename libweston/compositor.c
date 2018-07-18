@@ -54,6 +54,7 @@
 #include "timeline.h"
 
 #include "compositor.h"
+#include "compositor/weston.h"
 #include "viewporter-server-protocol.h"
 #include "presentation-time-server-protocol.h"
 #include "shared/helpers.h"
@@ -4315,6 +4316,7 @@ bind_output(struct wl_client *client,
 	struct weston_output *output = data;
 	struct weston_mode *mode;
 	struct wl_resource *resource;
+	bool find_mode = false;
 
 	resource = wl_resource_create(client, &wl_output_interface,
 				      version, id);
@@ -4339,12 +4341,42 @@ bind_output(struct wl_client *client,
 				     output->current_scale);
 
 	wl_list_for_each (mode, &output->mode_list, link) {
-		wl_output_send_mode(resource,
-				    mode->flags,
-				    mode->width,
-				    mode->height,
-				    mode->refresh);
+		if (output->vir_width == 0 && output->vir_height == 0) {
+			wl_output_send_mode(resource,
+					    mode->flags,
+					    mode->width,
+					    mode->height,
+					    mode->refresh);
+		} else if (find_mode == false &&
+			   mode->width == output->vir_width &&
+			   mode->height == output->vir_height) {
+			wl_output_send_mode(resource,
+					    WL_OUTPUT_MODE_PREFERRED |
+					    WL_OUTPUT_MODE_CURRENT,
+					    output->vir_width,
+					    output->vir_height,
+					    mode->refresh);
+			find_mode = true;
+		} else {
+			wl_output_send_mode(resource,
+					    0,
+					    mode->width,
+					    mode->height,
+					    mode->refresh);
+		}
 	}
+
+	/* If fake mode is not in the mode list,
+	 * send it as prefer and current mode.
+	 */
+	if (output->vir_width != 0 && output->vir_height != 0 &&
+	    find_mode == false)
+		wl_output_send_mode(resource,
+				    WL_OUTPUT_MODE_PREFERRED |
+				    WL_OUTPUT_MODE_CURRENT,
+				    output->vir_width,
+				    output->vir_height,
+				    60);
 
 	if (version >= WL_OUTPUT_DONE_SINCE_VERSION)
 		wl_output_send_done(resource);
@@ -4861,11 +4893,30 @@ weston_output_enable(struct weston_output *output)
 	struct weston_compositor *c = output->compositor;
 	struct weston_output *iterator;
 	int x = 0, y = 0;
+	struct weston_config *wc = wet_get_config(output->compositor);
+	struct weston_config_section *section;
 
 	if (output->enabled) {
 		weston_log("Error: attempt to enable an enabled output '%s'\n",
 			   output->name);
 		return -1;
+	}
+
+	section = weston_config_get_section(wc, "output", "name", output->name);
+	if (section) {
+		char *fake_mode;
+		int width = 0;
+		int height = 0;
+
+		weston_config_section_get_string(section, "fake_mode", &fake_mode, NULL);
+		if (!fake_mode || sscanf(fake_mode, "%dx%d", &width, &height) != 2) {
+			weston_log("Invalid mode for output %s. Using defaults.\n",
+				   output->name);
+		} else {
+			output->vir_width = width;
+			output->vir_height = height;
+		}
+		free(fake_mode);
 	}
 
 	iterator = container_of(c->output_list.prev,
