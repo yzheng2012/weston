@@ -4057,6 +4057,7 @@ drm_output_init_egl(struct drm_output *output, struct drm_backend *b)
 		height = output->base.vir_height;
 	else
 		height = output->base.current_mode->height;
+	output->gbm_format = GBM_FORMAT_ARGB8888;
 	output->gbm_surface = gbm_surface_create(b->gbm,
 					     width,
 					     height,
