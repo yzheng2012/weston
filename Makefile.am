@@ -519,7 +519,7 @@ spring_tool_SOURCES =				\
 
 if BUILD_CLIENTS
 
-bin_PROGRAMS += weston-terminal weston-info weston-switch-mode
+bin_PROGRAMS += weston-terminal weston-info weston-switch-mode weston-testdisplayconfig
 
 libexec_PROGRAMS +=				\
 	weston-desktop-shell			\
@@ -837,11 +837,11 @@ weston_info_CFLAGS = $(AM_CFLAGS) $(CLIENT_CFLAGS)
 
 lib_LTLIBRARIES += libweston-outputmanager.la
 libweston_outputmanager_la_SOURCES = \
-    liboutputmanager/wlrandr_output_manager.h \
-    liboutputmanager/wlrandr_output_manager.c
+	liboutputmanager/wlrandr_output_manager.h \
+	liboutputmanager/wlrandr_output_manager.c
 nodist_libweston_outputmanager_la_SOURCES =         \
-    protocol/wlrandr-client-protocol.h      \
-    protocol/wlrandr-protocol.c
+	protocol/wlrandr-client-protocol.h      \
+	protocol/wlrandr-protocol.c
 libweston_outputmanager_la_LIBADD = $(WESTON_INFO_LIBS)
 libweston_outputmanager_CFLAGS = $(AM_CFLAGS) $(CLIENT_CFLAGS)
 
@@ -853,6 +853,12 @@ nodist_weston_switch_mode_SOURCES =			\
 	protocol/wlrandr-protocol.c
 weston_switch_mode_LDADD = $(WESTON_INFO_LIBS) libshared.la
 weston_switch_mode_CFLAGS = $(AM_CFLAGS) $(CLIENT_CFLAGS) $(LIBDRM_CFLAGS)
+
+#demo_clients += weston-testdisplayconfig
+weston_testdisplayconfig_SOURCES = clients/testdisplayconfig.c
+weston_testdisplayconfig_LDADD = libdisplayconfig.la libshared.la  $(WESTON_INFO_LIBS)
+weston_testdisplayconfig_CFLAGS = $(AM_CFLAGS) $(CLIENT_CFLAGS)
+
 
 weston_desktop_shell_SOURCES = 				\
 	clients/desktop-shell.c				\
@@ -989,6 +995,21 @@ nodist_desktop_shell_la_SOURCES =			\
 
 BUILT_SOURCES += $(nodist_desktop_shell_la_SOURCES)
 endif
+
+libweston_module_LTLIBRARIES += libdisplayconfig.la
+libdisplayconfig_la_CPPFLAGS =                  \
+	-I$(top_builddir)/protocol              \
+	-I$(top_srcdir)/shared
+libdisplayconfig_la_LDFLAGS = -module -avoid-version
+libdisplayconfig_la_LIBADD = $(CLIENT_LIBS) libshared.la
+libdisplayconfig_la_CFLAGS = $(AM_CFLAGS) $(COMPOSITOR_CFLAGS) $(LIBDRM_CFLAGS)  -fPIC -shared
+libdisplayconfig_la_SOURCES =                      \
+	liboutputmanager/wlrandr_output_manager.h	\
+	liboutputmanager/wlrandr_output_manager.c	\
+	clients/displayconfig.c				\
+	clients/displayconfig.h				\
+	protocol/wlrandr-client-protocol.h		\
+	protocol/wlrandr-protocol.c
 
 if ENABLE_FULLSCREEN_SHELL
 

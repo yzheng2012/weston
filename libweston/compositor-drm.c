@@ -2387,9 +2387,11 @@ drm_output_repaint(struct weston_output *output_base,
 						   DRM_OUTPUT_STATE_CLEAR_PLANES);
 	state->dpms = WESTON_DPMS_ON;
 
+	output->gbm_format = GBM_FORMAT_ARGB8888;
 	drm_output_render(state, damage);
 	scanout_state = drm_output_state_get_plane(state,
 						   output->scanout_plane);
+	output->gbm_format = GBM_FORMAT_XRGB8888;
 	if (!scanout_state || !scanout_state->fb)
 		goto err;
 
@@ -4057,7 +4059,6 @@ drm_output_init_egl(struct drm_output *output, struct drm_backend *b)
 		height = output->base.vir_height;
 	else
 		height = output->base.current_mode->height;
-	output->gbm_format = GBM_FORMAT_ARGB8888;
 	output->gbm_surface = gbm_surface_create(b->gbm,
 					     width,
 					     height,
