@@ -36,6 +36,7 @@
 #include "shared/helpers.h"
 #include "weston.h"
 #include "wlrandr-server-protocol.h"
+#include "../../libhdmiset-master/drm/hdmiset.h"
 
 struct wlrandr_impl {
 	struct weston_compositor *ec;
@@ -189,8 +190,18 @@ wlrandr_get_mode_list(struct wl_client *client,
 	struct weston_output *w_output =
 		weston_output_from_resource(output);
 	struct weston_mode *mode;
+	struct drm_mode *drmmode = NULL;
 
 	wl_list_for_each(mode, &w_output->mode_list, link) {
+		drmmode = container_of(mode, struct drm_mode, base);
+		if (drmmode == NULL)
+			return;
+
+		bool r = check_mode((void*)&drmmode->mode_info);
+
+		if (r == false)
+			continue;
+
 		wlrandr_send_mode(resource,
 				  mode->width,
 				  mode->height,
@@ -344,4 +355,5 @@ wlrandr_create(struct weston_compositor *ec)
 					 randr, bind_wlrandr);
 	randr->destroy_listener.notify = wlrandr_destroy;
 	wl_signal_add(&ec->destroy_signal, &randr->destroy_listener);
+	parse_white_mode();
 }
