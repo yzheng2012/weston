@@ -22,15 +22,12 @@ cscope.out
 .dirstamp
 /aclocal.m4
 /autom4te.cache
-/build-aux/
 /config.guess
 /config.h
-/config.h.in
 /config.log
 /config.mk
 /config.status
 /config.sub
-/configure
 /depcomp
 /doc/doxygen/*.doxygen
 /docs/developer
@@ -44,7 +41,6 @@ cscope.out
 /test-driver
 /weston.ini
 Makefile
-Makefile.in
 TAGS
 protocol/.*.valid
 protocol/*.[ch]
