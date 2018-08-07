@@ -2694,8 +2694,8 @@ func_infer_tag ()
 	# was found and let the user know that the "--tag" command
 	# line option must be used.
 	if test -z "$tagname"; then
-	  func_echo "defaulting to \`CC'"
-	  func_echo "if this is not correct, specify a tag with \`--tag'"
+	  func_echo "unable to infer tagged configuration"
+	  func_fatal_error "specify a tag with '--tag'"
 #	else
 #	  func_verbose "using $tagname tagged configuration"
 	fi
@@ -4284,12 +4284,8 @@ func_mode_install ()
 	  # At present, this check doesn't affect windows .dll's that
 	  # are installed into $libdir/../bin (currently, that works fine)
 	  # but it's something to keep an eye on.
-
-	  #
-	  # This breaks install into our staging area.  -PB
-	  #
-	  #test "$inst_prefix_dir" = "$destdir" && \
-	  #  func_fatal_error "error: cannot install '$file' to a directory not ending in $libdir"
+	  test "$inst_prefix_dir" = "$destdir" && \
+	    func_fatal_error "error: cannot install '$file' to a directory not ending in $libdir"
 
 	  if test -n "$inst_prefix_dir"; then
 	    # Stick the inst_prefix_dir data into the link command.
@@ -6579,8 +6575,7 @@ func_mode_link ()
 	;;
       -all-static | -static | -static-libtool-libs)
 	case $arg in
-	# Make -static behave like -all-static -GZ
-	-all-static | -static)
+	-all-static)
 	  if test yes = "$build_libtool_libs" && test -z "$link_static_flag"; then
 	    func_warning "complete static linking is impossible in this configuration"
 	  fi
@@ -6588,6 +6583,12 @@ func_mode_link ()
 	    dlopen_self=$dlopen_self_static
 	  fi
 	  prefer_static_libs=yes
+	  ;;
+	-static)
+	  if test -z "$pic_flag" && test -n "$link_static_flag"; then
+	    dlopen_self=$dlopen_self_static
+	  fi
+	  prefer_static_libs=built
 	  ;;
 	-static-libtool-libs)
 	  if test -z "$pic_flag" && test -n "$link_static_flag"; then
@@ -6882,8 +6883,7 @@ func_mode_link ()
       prevarg=$arg
 
       case $arg in
-      # Make -static behave like -all-static -GZ
-      -all-static | -static)
+      -all-static)
 	if test -n "$link_static_flag"; then
 	  # See comment for -static flag below, for more details.
 	  func_append compile_command " $link_static_flag"
@@ -7174,7 +7174,7 @@ func_mode_link ()
 	continue
 	;;
 
-      -static-libtool-libs)
+      -static | -static-libtool-libs)
 	# The effects of -static are defined in a previous loop.
 	# We used to do the same as -all-static on platforms that
 	# didn't have a PIC flag, but the assumption that the effects
@@ -8140,7 +8140,7 @@ func_mode_link ()
 	  *)
 	    if test no = "$installed"; then
 	      func_append notinst_deplibs " $lib"
-	      need_relink=no
+	      need_relink=yes
 	    fi
 	    ;;
 	  esac
@@ -10769,10 +10769,6 @@ EOF
 	    # Replace all uninstalled libtool libraries with the installed ones
 	    newdependency_libs=
 	    for deplib in $dependency_libs; do
-	      # Replacing uninstalled with installed can easily break crosscompilation,
-	      # since the installed path is generally the wrong architecture.  -CL
-	      newdependency_libs="$newdependency_libs $deplib"
-	      continue
 	      case $deplib in
 	      *.la)
 		func_basename "$deplib"
