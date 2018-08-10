@@ -117,7 +117,6 @@ static void
 handle_global(void *data, struct wl_registry *registry,
 		uint32_t name, const char *interface, uint32_t version)
 {
-	pthread_mutex_lock(&lock_);
 
 	if (strcmp(interface, "wl_output") == 0) {
 		struct randr_output *moutput;
@@ -131,7 +130,6 @@ handle_global(void *data, struct wl_registry *registry,
 		m_output_info.wlrandr = wl_registry_bind(registry, name, &wlrandr_interface, 1);
 	}
 
-	pthread_mutex_unlock(&lock_);
 }
 
 static void
@@ -293,10 +291,8 @@ wlrandr_set_mode(char* output_name, struct wlrandr_output_mode *outputmode)
 	if (!output_name || !outputmode)
 		return -WLRANDR_RESULT_INPUT_ERROR;
 
-	pthread_mutex_lock(&lock_);
 
 	if (wl_list_length(&m_output_info.output_list) <= 0) {
-		pthread_mutex_unlock(&lock_);
 		return -WLRANDR_RESULT_NO_OUTPUT;
 	}
 
@@ -311,7 +307,6 @@ wlrandr_set_mode(char* output_name, struct wlrandr_output_mode *outputmode)
 			    outputmode->refresh, outputmode->flags);
 	ret = wlrandr_wait_result_timeout(WLRANDR_EVENT_LIST_EVENT_SWITCH_MODE);
 
-	pthread_mutex_unlock(&lock_);
 
 	if (ret < 0)
 		return ret;
