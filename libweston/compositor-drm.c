@@ -83,6 +83,12 @@
 #define GBM_BO_USE_CURSOR GBM_BO_USE_CURSOR_64X64
 #endif
 
+#define CVBS_P_MODE 10
+#define CVBS_I_MODE 4122
+#define HDMI_P_MODE 5
+#define HDMI_I_MODE 21
+#define DRM_I_MODE 0
+#define DRM_P_MODE 0x10
 /**
  * Represents the values of an enum-type KMS property
  */
@@ -4486,6 +4492,13 @@ drm_output_choose_initial_mode(struct drm_backend *backend,
 		}
 	}
 
+	if (target_flags == HDMI_P_MODE  || target_flags == CVBS_P_MODE) {
+		target_flags = DRM_P_MODE;
+        }
+	if (target_flags==CVBS_I_MODE || target_flags==HDMI_I_MODE) {
+		target_flags = DRM_I_MODE;
+        }
+
 	wl_list_for_each_reverse(drm_mode, &output->base.mode_list, base.link) {
 		uint32_t interlaced =
 			drm_mode->mode_info.flags & DRM_MODE_FLAG_INTERLACE;
@@ -5099,7 +5112,7 @@ update_outputs(struct drm_backend *b, struct udev_device *drm_device)
 	struct drm_output *output, *next;
 	uint32_t *connected;
 	int i;
-
+	int conn_count = 0;
 	resources = drmModeGetResources(b->drm.fd);
 	if (!resources) {
 		weston_log("drmModeGetResources failed\n");
@@ -5126,15 +5139,7 @@ update_outputs(struct drm_backend *b, struct udev_device *drm_device)
 		}
 
 		connected[i] = connector_id;
-
-		if (drm_output_find_by_connector(b, connector_id)) {
-			drmModeFreeConnector(connector);
-			continue;
-		}
-
-		create_output_for_connector(b, resources,
-					    connector, drm_device);
-		weston_log("connector %d connected\n", connector_id);
+		conn_count++;
 	}
 
 	wl_list_for_each_safe(output, next, &b->compositor->output_list,
@@ -5147,8 +5152,15 @@ update_outputs(struct drm_backend *b, struct udev_device *drm_device)
 				break;
 			}
 		}
+		//cvbs and hdmi are all connect,let cvbs disconnet
+		if (conn_count == 2 &&
+		    output->connector->connector_type == DRM_MODE_CONNECTOR_TV)
+			disconnected = true;
 
 		if (!disconnected)
+			continue;
+
+		if (!output)
 			continue;
 
 		weston_log("connector %d disconnected\n", output->connector_id);
@@ -5165,6 +5177,10 @@ update_outputs(struct drm_backend *b, struct udev_device *drm_device)
 				break;
 			}
 		}
+		//cvbs and hdmi are all connect,let cvbs disconnet
+		if (conn_count == 2 &&
+		    output->connector->connector_type == DRM_MODE_CONNECTOR_TV)
+			disconnected = true;
 
 		if (!disconnected)
 			continue;
@@ -5172,9 +5188,23 @@ update_outputs(struct drm_backend *b, struct udev_device *drm_device)
 		weston_log("connector %d disconnected\n", output->connector_id);
 		drm_output_destroy(&output->base);
 	}
-
-	drm_backend_update_unused_outputs(b, resources);
-
+	// added by qiuen
+	for (i = 0; i < resources->count_connectors; i++) {
+		if (connected[i] > 0) {
+			connector = drmModeGetConnector(b->drm.fd, connected[i]);
+			if (connector == NULL)
+				continue;
+			if (drm_output_find_by_connector(b, connected[i])) {
+				drmModeFreeConnector(connector);
+				continue;
+			}
+			weston_log(">>>>create_output_for_connector\n");
+			create_output_for_connector(b, resources,
+						    connector, drm_device);
+			weston_log("connector %d connected\n", connected[i]);
+		}
+	}
+	// added by qiuen end
 	free(connected);
 	drmModeFreeResources(resources);
 }
