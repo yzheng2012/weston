@@ -285,7 +285,8 @@ wlrandr_get_curmode(char* output_name, struct wlrandr_output_mode *outputmode)
 WL_EXPORT int
 wlrandr_set_mode(char* output_name, struct wlrandr_output_mode *outputmode)
 {
-	struct randr_output *output;
+	struct randr_output *output = NULL;
+	int num_devices = 0;
 	int ret;
 
 	if (!output_name || !outputmode)
@@ -300,13 +301,16 @@ wlrandr_set_mode(char* output_name, struct wlrandr_output_mode *outputmode)
 		if (output->output_name && !strcmp(output_name, output->output_name))
 			break;
 	}
-
+	if (output == NULL) {
+		return -1;
+	}
 	event_ret.mode_switched = 0;
 	wlrandr_switch_mode(m_output_info.wlrandr, output->output,
 			    outputmode->width, outputmode->height,
 			    outputmode->refresh, outputmode->flags);
 	ret = wlrandr_wait_result_timeout(WLRANDR_EVENT_LIST_EVENT_SWITCH_MODE);
 
+	wlrandr_get_output_devices(&num_devices);
 
 	if (ret < 0)
 		return ret;
