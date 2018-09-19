@@ -87,8 +87,8 @@
 #define CVBS_I_MODE 4122
 #define HDMI_P_MODE 5
 #define HDMI_I_MODE 21
-#define DRM_I_MODE 0
-#define DRM_P_MODE 0x10
+#define DRM_I_MODE 0x10
+#define DRM_P_MODE 0x0
 /**
  * Represents the values of an enum-type KMS property
  */
