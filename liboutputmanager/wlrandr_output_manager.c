@@ -19,6 +19,7 @@ struct event_result {
 	uint32_t mode_current_done;
 	uint32_t output_name_done;
 	uint32_t switch_result;
+	uint32_t save_config_done;
 };
 
 struct randr_output {
@@ -55,6 +56,8 @@ result_done(void *data, struct wlrandr *wlrander, uint32_t type, uint32_t result
 		event_ret.mode_get_done = 1;
 	else if (type == WLRANDR_EVENT_LIST_EVENT_GET_CUR_MODE)
 		event_ret.mode_current_done = 1;
+	else if (type == WLRANDR_EVENT_LIST_EVENT_SAVE_CONFIG)
+		event_ret.save_config_done = 1;
 	event_ret.switch_result = result;
 }
 
@@ -180,6 +183,8 @@ wlrandr_wait_result_timeout(int type)
 		result = &event_ret.output_name_done;
 	else if (type == WLRANDR_EVENT_LIST_EVENT_GET_CUR_MODE)
 		result = &event_ret.mode_current_done;
+	else if (type == WLRANDR_EVENT_LIST_EVENT_SAVE_CONFIG)
+		result = &event_ret.save_config_done;
 	while (!(*result) && timeout <= EVENT_TIMEOUT_CNT) {
 		wl_display_roundtrip(m_output_info.display);
 		timeout++;
@@ -309,9 +314,10 @@ wlrandr_set_mode(char* output_name, struct wlrandr_output_mode *outputmode)
 			    outputmode->width, outputmode->height,
 			    outputmode->refresh, outputmode->flags);
 	ret = wlrandr_wait_result_timeout(WLRANDR_EVENT_LIST_EVENT_SWITCH_MODE);
-
-	wlrandr_get_output_devices(&num_devices);
-
+    wlrandr_save_config(m_output_info.wlrandr, output->output, 0);
+	ret = wlrandr_wait_result_timeout(WLRANDR_EVENT_LIST_EVENT_SAVE_CONFIG);
+	int num_devices = 0;
+    wlrandr_get_output_devices(&num_devices);
 	if (ret < 0)
 		return ret;
 
@@ -411,9 +417,11 @@ wlrandr_deinit(void)
 		wl_list_remove(&output->link);
 		free(output);
 	}
-
+    wl_registry_destroy(m_output_info.wlrandr);
+	wl_display_flush(m_output_info.display);
+	 wl_display_roundtrip(m_output_info.display);
 	wl_display_disconnect(m_output_info.display);
-
+	m_output_info.wlrandr = NULL;
 	pthread_mutex_destroy(&lock_);
 
 	return WLRANDR_RESULT_SUCCESS;

@@ -283,7 +283,7 @@ wlrandr_save_config(struct wl_client *client,
 	mslot->mode.vdisplay= mode->mode_info.vdisplay;
 	mslot->mode.hsync_start = mode->mode_info.hsync_start;
 	mslot->mode.hsync_end = mode->mode_info.hsync_end;
-	mslot->mode.vsync_start = mode->mode_info.vsync_end;
+	mslot->mode.vsync_start = mode->mode_info.vsync_start;
 	mslot->mode.vsync_end = mode->mode_info.vsync_end;
 	mslot->mode.clock = mode->mode_info.clock;
 	mslot->mode.vtotal = mode->mode_info.vtotal;
@@ -301,6 +301,7 @@ wlrandr_save_config(struct wl_client *client,
 
 	close(file);
 	sync();
+	wlrandr_send_done(resource, WLRANDR_EVENT_LIST_EVENT_SAVE_CONFIG, 0);
 }
 
 

@@ -62,7 +62,7 @@
 #include "presentation-time-server-protocol.h"
 #include "linux-dmabuf.h"
 #include "linux-dmabuf-unstable-v1-server-protocol.h"
-
+#include "../compositor/baseparameter.h"
 #ifndef DRM_CAP_TIMESTAMP_MONOTONIC
 #define DRM_CAP_TIMESTAMP_MONOTONIC 0x6
 #endif
@@ -457,6 +457,104 @@ struct drm_output {
 	struct wl_event_source *pageflip_timer;
 };
 
+static char const *const device_template[] =
+{
+	"/dev/block/platform/1021c000.dwmmc/by-name/baseparameter",
+	"/dev/block/platform/30020000.dwmmc/by-name/baseparameter",
+	"/dev/block/platform/fe330000.sdhci/by-name/baseparameter",
+	"/dev/block/platform/ff520000.dwmmc/by-name/baseparameter",
+	"/dev/block/platform/ff0f0000.dwmmc/by-name/baseparameter",
+	"/dev/block/rknand_baseparameter",
+	NULL
+};
+static const char*
+get_baseparam_file(void)
+{
+	int i = 0;
+
+	while (device_template[i]) {
+		if (!access(device_template[i], R_OK | W_OK))
+			return device_template[i];
+		i++;
+	}
+	return NULL;
+}
+
+static int
+find_suitable_info_slot(int dpy, struct file_base_paramer* base_param) {
+	struct disp_info* info;
+	int found = 0;
+
+	if (dpy == 0)
+		info = &base_param->main;
+	else
+		info = &base_param->aux;
+
+	for (int i = 0; i < 5; i++) {
+		if (info->screen_list[i].type != 0) {
+			found = i;
+			break;
+		}
+	}
+
+	if (found == -1)
+		found = 0;
+
+	weston_log("findSuitableInfoSlot: %d ", found);
+
+	return found;
+}
+
+static bool
+get_baseparameter_info(struct file_base_paramer* base_paramer) {
+    int file;
+	const char *file_base_paramer = get_baseparam_file();
+	if (file_base_paramer) {
+		 file = open(file_base_paramer, O_RDWR);
+		 if (file > 0) {
+			unsigned int length = lseek(file, 0L, SEEK_END);
+			lseek(file, 0L, SEEK_SET);
+			printf("getBaseParameterInfo size=%d\n", (int)sizeof(*base_paramer));
+			if (length >  sizeof(*base_paramer)) {
+				read(file, (void*)&(base_paramer->main), sizeof(base_paramer->main));
+				lseek(file, BASE_OFFSET, SEEK_SET);
+				read(file, (void*)&(base_paramer->aux), sizeof(base_paramer->aux));
+				return true;
+			}
+		 }
+    }
+    return false;
+}
+
+static int
+hdmi_get_last_resolution(struct drm_mode *mode, int dpy)
+{
+   int slot = 0;
+   int find_mode = 0;
+   int display = 0;
+   struct file_base_paramer base_paramer;
+   get_baseparameter_info(&base_paramer);
+   if (dpy == 0) {
+		int found = find_suitable_info_slot(dpy, &base_paramer);
+		mode->mode_info.type = base_paramer.main.screen_list[found].type;
+		mode->mode_info.hdisplay = base_paramer.main.screen_list[found].mode.hdisplay;
+		mode->mode_info.vdisplay = base_paramer.main.screen_list[found].mode.vdisplay;
+		mode->mode_info.hsync_start = base_paramer.main.screen_list[found].mode.hsync_start;
+		mode->mode_info.hsync_end = base_paramer.main.screen_list[found].mode.hsync_end;
+		mode->mode_info.vsync_start = base_paramer.main.screen_list[found].mode.vsync_start;
+		mode->mode_info.vsync_end = base_paramer.main.screen_list[found].mode.vsync_end;
+		mode->mode_info.clock = base_paramer.main.screen_list[found].mode.clock;
+		mode->mode_info.vtotal = base_paramer.main.screen_list[found].mode.vtotal;
+		mode->mode_info.htotal = base_paramer.main.screen_list[found].mode.htotal;
+		mode->mode_info.vscan = base_paramer.main.screen_list[found].mode.vscan;
+		mode->mode_info.flags = base_paramer.main.screen_list[found].mode.flags;
+
+   } else {
+
+   }
+}
+
+static int update_output_flag = 0;
 static struct gl_renderer_interface *gl_renderer;
 
 static const char default_seat[] = "seat0";
@@ -4469,6 +4567,7 @@ drm_output_choose_initial_mode(struct drm_backend *backend,
 	struct drm_mode *configured = NULL;
 	struct drm_mode *best = NULL;
 	struct drm_mode *drm_mode;
+	struct drm_mode last_drm_mode;
 	drmModeModeInfo drm_modeline;
 	int32_t width = 0;
 	int32_t height = 0;
@@ -4499,6 +4598,16 @@ drm_output_choose_initial_mode(struct drm_backend *backend,
 		target_flags = DRM_I_MODE;
         }
 
+	if (update_output_flag > 0) {
+		int dpy = 0;
+		int interlaced = 0;
+		if (!strcmp(output->base.name, "HDMI-A-1")) {
+			dpy = 0;
+		} else {
+			dpy = 1;
+		}
+		hdmi_get_last_resolution(&last_drm_mode, dpy);
+	}
 	wl_list_for_each_reverse(drm_mode, &output->base.mode_list, base.link) {
 		uint32_t interlaced =
 			drm_mode->mode_info.flags & DRM_MODE_FLAG_INTERLACE;
@@ -4508,6 +4617,38 @@ drm_output_choose_initial_mode(struct drm_backend *backend,
 		    target_flags == interlaced &&
 		    (refresh == 0 || refresh == drm_mode->base.refresh))
 			configured = drm_mode;
+
+		if (update_output_flag > 0) {
+			if (drm_mode->mode_info.hdisplay== last_drm_mode.mode_info.hdisplay &&
+				drm_mode->mode_info.vdisplay == last_drm_mode.mode_info.vdisplay) {
+                weston_log(">>>>set mode hdisplay(%d,%d),vdisplay(%d,%d),hsync_start(%d,%d),hsync_end(%d,%d),clock(%d,%d),vscan(%d,%d),vsync_start(%d,%d)\n",
+					       drm_mode->mode_info.hdisplay,last_drm_mode.mode_info.hdisplay,\
+					       drm_mode->mode_info.vdisplay , last_drm_mode.mode_info.vdisplay,\
+					       drm_mode->mode_info.hsync_start , last_drm_mode.mode_info.hsync_start,\
+					       drm_mode->mode_info.hsync_end , last_drm_mode.mode_info.hsync_end,\
+					       drm_mode->mode_info.clock , last_drm_mode.mode_info.clock,\
+					       drm_mode->mode_info.vscan, last_drm_mode.mode_info.vscan,\
+					       drm_mode->mode_info.vsync_start,last_drm_mode.mode_info.vsync_start \
+						   );
+			}
+			if (drm_mode->mode_info.hdisplay == last_drm_mode.mode_info.hdisplay &&
+				drm_mode->mode_info.vdisplay == last_drm_mode.mode_info.vdisplay &&
+				drm_mode->mode_info.hsync_start == last_drm_mode.mode_info.hsync_start &&
+				drm_mode->mode_info.hsync_end == last_drm_mode.mode_info.hsync_end &&
+				drm_mode->mode_info.vsync_start == last_drm_mode.mode_info.vsync_start &&
+				drm_mode->mode_info.vsync_end == last_drm_mode.mode_info.vsync_end &&
+				drm_mode->mode_info.clock == last_drm_mode.mode_info.clock &&
+				drm_mode->mode_info.vscan == last_drm_mode.mode_info.vscan &&
+				drm_mode->mode_info.hsync_start == last_drm_mode.mode_info.hsync_start &&
+				drm_mode->mode_info.hsync_end == last_drm_mode.mode_info.hsync_end &&
+				drm_mode->mode_info.vtotal == last_drm_mode.mode_info.vtotal &&
+				drm_mode->mode_info.htotal == last_drm_mode.mode_info.htotal &&
+				drm_mode->mode_info.flags == last_drm_mode.mode_info.flags) {
+				update_output_flag = 0;
+				configured = drm_mode;
+				break;
+			}
+		}
 
 		if (memcmp(current_mode, &drm_mode->mode_info,
 			   sizeof *current_mode) == 0)
@@ -5124,7 +5265,7 @@ update_outputs(struct drm_backend *b, struct udev_device *drm_device)
 		drmModeFreeResources(resources);
 		return;
 	}
-
+	update_output_flag = 1;
 	/* collect new connects */
 	for (i = 0; i < resources->count_connectors; i++) {
 		uint32_t connector_id = resources->connectors[i];
@@ -5707,7 +5848,7 @@ drm_backend_create(struct weston_compositor *compositor,
 	b->drm.fd = -1;
 	wl_array_init(&b->unused_crtcs);
 	wl_array_init(&b->unused_connectors);
-
+	update_output_flag = 1;
 	/*
 	 * KMS support for hardware planes cannot properly synchronize
 	 * without nuclear page flip. Without nuclear/atomic, hw plane
