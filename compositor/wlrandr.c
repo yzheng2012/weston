@@ -199,7 +199,7 @@ wlrandr_get_mode_list(struct wl_client *client,
 
 		bool r = check_mode((void*)&drmmode->mode_info);
 
-		if (r == false)
+		if (r == false && !strcmp(w_output->name, "HDMI-A-1"))
 			continue;
 
 		wlrandr_send_mode(resource,
